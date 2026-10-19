@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.macd2.agent-orb",
+  "name": "Agent Orb",
+  "version": "1.0.0",
+  "author": "macd2",
+  "license": "MIT",
+  "description": "Floating wireframe orb in the bottom-left corner that watches every agent session (opencode, codex, claude, hermes, pi and a dozen more) and swells briefly when any of them is working.",
+  "kinds": [
+    "panel"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "panel": "Main.qml"
+  }
+}

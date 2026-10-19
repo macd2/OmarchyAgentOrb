@@ -1,0 +1,65 @@
+# ---- Omarchy plugin runtime ------------------------------------------
+# install.sh copies (or symlinks, with --watch) ai.agent-face/ into
+# ~/.config/omarchy/plugins/. If anyone instead drops the plugin folder inside
+# this repo to test it, keep the mounted copy out of history.
+ai.agent-face/build/
+*.qsb
+
+# ---- QML / Qt caches --------------------------------------------------
+*.qmlc
+*.jsc
+.qmlcache/
+cache/
+.cache/
+
+# ---- Node watcher -----------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-error.log*
+package-lock.json.bak
+
+# ---- runtime state ----------------------------------------------------
+# Written by watcher/agent-watch.js, read by Main.qml.
+state.json
+*.state.json
+*.pid
+*.lock
+*.sock
+
+# ---- logs & scratch ---------------------------------------------------
+*.log
+logs/
+tmp/
+scratch/
+# Screenshots made while debugging. preview.png is deliberately exempt: the
+# marketplace requires it at the repository root and generates its own
+# optimised card images from it.
+*.png
+*.jpg
+*.capture.*
+!preview.png
+
+# ---- local overrides --------------------------------------------------
+# Keep personal tunables and secrets out of the shared tree.
+.env
+.env.*
+!.env.example
+*.local
+*.local.*
+local/
+
+# ---- editors / OS -----------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ---- packaging noise --------------------------------------------------
+*.deb
+*.rpm
+*.AppImage
+*.tar
+*.tar.gz

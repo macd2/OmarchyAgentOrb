@@ -1,0 +1,153 @@
+<!doctype html>
+<!--
+  Source of preview.png. The mesh is drawn by the orb's own geometry and edge
+  shading (copied from Main.qml), frozen at one moment, then given a bloom so it
+  reads at banner size. Render with scripts/preview/render.sh.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600&family=Space+Grotesk:wght@400;500&display=block" rel="stylesheet">
+<style>
+  html, body { margin: 0; width: 1600px; height: 900px; overflow: hidden; }
+  body {
+    background:
+      radial-gradient(ellipse 900px 620px at 800px 450px, #3a6db0 0%, #1f3a66 45%, #0d1626 80%, #05080f 100%);
+    font-family: "Space Grotesk", sans-serif;
+    position: relative;
+  }
+  #orb { position: absolute; left: 10px; top: 0; }
+  .text { position: absolute; left: 900px; color: #eef2fb; }
+  h1 { margin: 0; font-family: "Chakra Petch", sans-serif; font-size: 100px; font-weight: 600; letter-spacing: -1px; line-height: 1; }
+  .sub { font-size: 32px; font-weight: 400; color: #b9c6e4; line-height: 1.45; }
+  .agents { display: flex; align-items: center; gap: 10px; color: #eef2fb; }
+  .agents b { width: 50px; height: 50px; border-radius: 12px; flex: none; display: grid; place-items: center;
+              background: #121a2c; box-shadow: inset 0 0 0 1px #2c3b5c; }
+  .agents svg { width: 30px; height: 30px; display: block; }
+  .agents span { font-size: 22px; font-weight: 500; color: #8fa0c6; margin-left: 8px; white-space: nowrap; }
+  .meta { font-size: 21px; color: #6a7899; }
+  .meta i { font-style: normal; padding: 0 8px; }
+</style>
+</head>
+<body>
+<canvas id="orb" width="900" height="900"></canvas>
+<div class="text" style="top:318px"><h1>Agent Orb</h1></div>
+<div class="text sub" style="top:438px">A floating orb that watches every<br>AI coding agent on your machine.</div>
+<div class="text agents" id="agents" style="top:560px"></div>
+<div class="text meta" style="top:650px">Omarchy plugin<i>·</i>MIT</div>
+<script>
+const P = new URLSearchParams(location.search)
+// Hue anchors: the four theme colours the orb reads (accent, popups.border,
+// notifications.countdown, tooltip.border). Default: four Tokyo Night hues.
+const HUES = (P.get("hues") || "7aa2f7,bb9af7,7dcfff,9ece6a").split(",")
+  .map(h => [parseInt(h.slice(0,2),16)/255, parseInt(h.slice(2,4),16)/255, parseInt(h.slice(4,6),16)/255])
+const TIME = Number(P.get("time") || 7.0)
+const ENERGY = Number(P.get("energy") || 0.45)
+const [cA, cB, cC, cD] = HUES
+
+// ---- port of Main.qml: geometry, noise, edge shading ----------------------
+function norm(v){ const l=Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2])||1; return [v[0]/l,v[1]/l,v[2]/l] }
+function dot(a,b){ return a[0]*b[0]+a[1]*b[1]+a[2]*b[2] }
+function mix(a,b,t){ return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t] }
+function iridescent(n){ const tx=n[0]*0.5+0.5, ty=n[1]*0.5+0.5; return mix(mix(cA,cB,tx),mix(cC,cD,tx),ty) }
+function h3(x,y,z){ const n=Math.sin(x*127.1+y*311.7+z*74.7)*43758.5453; return n-Math.floor(n) }
+function noise3(x,y,z){
+  const ix=Math.floor(x),iy=Math.floor(y),iz=Math.floor(z), fx=x-ix,fy=y-iy,fz=z-iz
+  const ux=fx*fx*(3-2*fx),uy=fy*fy*(3-2*fy),uz=fz*fz*(3-2*fz); let s=0
+  for(let dz=0;dz<2;dz++)for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++)
+    s+=h3(ix+dx,iy+dy,iz+dz)*(dx?ux:1-ux)*(dy?uy:1-uy)*(dz?uz:1-uz)
+  return s
+}
+function snoise(x,y,z){ return (noise3(x,y,z)*2-1)+(noise3(x*2.03,y*2.03,z*2.03)*2-1)*0.5 }
+function icosphere(subdiv){
+  const t=(1+Math.sqrt(5))/2
+  const v=[[-1,t,0],[1,t,0],[-1,-t,0],[1,-t,0],[0,-1,t],[0,1,t],[0,-1,-t],[0,1,-t],[t,0,-1],[t,0,1],[-t,0,-1],[-t,0,1]].map(norm)
+  let faces=[[0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],[1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],
+             [3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],[4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1]]
+  const cache={}
+  const mid=(a,b)=>{ const k=a<b?a+"_"+b:b+"_"+a; if(cache[k]!==undefined) return cache[k]
+    const pa=v[a],pb=v[b]; v.push(norm([(pa[0]+pb[0])/2,(pa[1]+pb[1])/2,(pa[2]+pb[2])/2])); return cache[k]=v.length-1 }
+  for(let s=0;s<subdiv;s++){ const next=[]
+    for(const [a,b,c] of faces){ const ab=mid(a,b),bc=mid(b,c),ca=mid(c,a); next.push([a,ab,ca],[b,bc,ab],[c,ca,bc],[ab,bc,ca]) }
+    faces=next }
+  const seen={}, e=[]
+  for(const f of faces) for(let j=0;j<3;j++){ const a=f[j],b=f[(j+1)%3],k=a<b?a+"_"+b:b+"_"+a; if(!seen[k]){seen[k]=1;e.push([a,b])} }
+  return {verts:v, edges:e}
+}
+// Main.qml paints on a 196px canvas; line widths are scaled by K. RS enlarges
+// the mesh (the window clips most of the canvas in the real orb), AF dims each
+// stroke so additive overlap keeps its hue instead of clipping to white.
+function paintMesh(ctx, W, H, K, time, e, RS, AF){
+  const {verts, edges} = icosphere(2)
+  const cx=W/2, cy=H/2, ambient=0.2
+  const orbitAmp=0.010+0.045*e
+  const ox=cx+Math.sin(time*0.34)*orbitAmp*W, oy=cy+Math.cos(time*0.27)*orbitAmp*H
+  const lightDir=norm([0.35,0.55,2.0])
+  const radius=Math.min(W,H)*(0.30+0.05*e)*RS, camZ=3.0
+  const rotY=time*(0.12+0.24*e), rotX=time*(0.05+0.14*e)
+  const cy_=Math.cos(rotY), sy=Math.sin(rotY), cxr=Math.cos(rotX), sx=Math.sin(rotX)
+  const dispAmp=0.125+0.16*e, skinW=0.16+0.28*e, skinA=0.020+0.028*e
+  const n=verts.length, px=[],py=[],pz=[],rnx=[],rny=[],rnz=[]
+  for(let i=0;i<n;i++){ const v=verts[i]
+    let d=snoise(v[0]*2+time*0.34, v[1]*2+time*0.34, v[2]*2+time*0.34)*dispAmp
+    d+=snoise(v[0]*3.6+time*skinW, v[1]*3.6-time*skinW*0.7, v[2]*3.6)*skinA
+    const wx=v[0]+v[0]*d, wy=v[1]+v[1]*d, wz=v[2]+v[2]*d
+    const ry1=wx*cy_-wz*sy, rz1=wx*sy+wz*cy_
+    px[i]=ry1*cxr-rz1*sx; py[i]=wy; pz[i]=ry1*sx+rz1*cxr
+    const nry=v[0]*cy_-v[2]*sy, nrz=v[0]*sy+v[2]*cy_
+    rnx[i]=nry; rny[i]=v[1]*cxr-nrz*sx; rnz[i]=v[1]*sx+nrz*cxr }
+  const depth=edges.map(([a,b])=>(pz[a]+pz[b])*0.5)
+  const order=edges.map((_,k)=>k).sort((a,b)=>depth[a]-depth[b])
+  ctx.lineCap="round"; ctx.globalCompositeOperation="lighter"
+  for(const idx of order){ const [a,b]=edges[idx]
+    const za=camZ-pz[a], zb=camZ-pz[b]; if(!(za>0.3)||!(zb>0.3)) continue
+    const sa=radius/za, sb=radius/zb
+    const ax=ox+px[a]*sa, ay=oy-py[a]*sa, bx=ox+px[b]*sb, by=oy-py[b]*sb
+    const mn=norm([(rnx[a]+rnx[b])*0.5,(rny[a]+rny[b])*0.5,(rnz[a]+rnz[b])*0.5]), base=iridescent(mn)
+    const diffuse=Math.max(0,dot(mn,lightDir)), fresnel=Math.pow(1-Math.min(1,Math.abs(mn[2])),2)
+    const lum=ambient+diffuse*1.35, glow=0.78+0.50*e
+    const c=base.map(x=>Math.min(248,Math.round(x*(lum+fresnel*0.45)*255*glow*0.82)))
+    const zfade=Math.max(0,Math.min(1,(depth[idx]+1.4)/2.4))
+    const alpha=(0.5+0.4*zfade)*(0.72+0.26*e)*AF
+    ctx.strokeStyle="rgba("+c[0]+","+c[1]+","+c[2]+","+alpha.toFixed(3)+")"
+    ctx.lineWidth=(0.5+0.45*zfade)*K
+    ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke() }
+  ctx.globalCompositeOperation="source-over"
+  return {ox, oy, radius: radius / camZ}
+}
+// ---------------------------------------------------------------------------
+
+// Canvas wider than the mesh so the halo and bloom fade out before its edge.
+const W = 900, K = 1.6
+const mesh = document.createElement("canvas"); mesh.width = mesh.height = W
+const m = paintMesh(mesh.getContext("2d"), W, W, K, TIME, ENERGY, 2.07, 0.6)
+
+const ctx = document.getElementById("orb").getContext("2d")
+// Halo in the accent hue, the same colour the orb's own impulse flash uses.
+const acc = HUES[0].map(x => Math.round(x * 255)).join(",")
+const halo = ctx.createRadialGradient(m.ox, m.oy, 0, m.ox, m.oy, m.radius * 1.75)
+halo.addColorStop(0,    "rgba(255,255,255,0.10)")
+halo.addColorStop(0.35, "rgba(" + acc + ",0.26)")
+halo.addColorStop(0.7,  "rgba(" + acc + ",0.09)")
+halo.addColorStop(1,    "rgba(" + acc + ",0)")
+ctx.fillStyle = halo; ctx.fillRect(0, 0, W, W)
+// Bloom: blurred copies of the mesh added under the sharp one.
+ctx.globalCompositeOperation = "lighter"
+ctx.filter = "blur(30px) saturate(1.8)"; ctx.drawImage(mesh, 0, 0); ctx.drawImage(mesh, 0, 0)
+ctx.filter = "blur(8px) saturate(1.8)";  ctx.drawImage(mesh, 0, 0)
+ctx.filter = "saturate(1.5)";            ctx.drawImage(mesh, 0, 0)
+ctx.filter = "none"
+ctx.globalCompositeOperation = "source-over"
+
+// Agent marks: the watcher detects 23 agents; these are the ones LobeHub has a
+// mark for, most used first. Brand colour where LobeHub has a colour mark.
+const MARKS = ["claudecode-color", "codex-color", "opencode", "geminicli-color", "hermesagent",
+               "githubcopilot", "cursor", "qwen-color", "kimi-color"]
+const WATCHED = 23
+Promise.all(MARKS.map(n => fetch("logos/" + n + ".svg").then(r => r.text()))).then(svgs => {
+  document.getElementById("agents").innerHTML =
+    svgs.map(v => "<b>" + v + "</b>").join("") + "<span>+" + (WATCHED - MARKS.length) + " more</span>"
+})
+</script>
+</body>
+</html>
