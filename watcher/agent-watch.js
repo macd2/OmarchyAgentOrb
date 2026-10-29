@@ -32,7 +32,11 @@ const STATE_DIR = path.join(process.env.XDG_STATE_HOME || path.join(HOME, '.loca
 const STATE_FILE = path.join(STATE_DIR, 'state.json')
 const LOCK_FILE = path.join(STATE_DIR, 'watcher.pid')
 
-fs.mkdirSync(STATE_DIR, { recursive: true })
+fs.mkdirSync(STATE_DIR, { recursive: true, mode: 0o700 })
+// mkdirSync does not change the mode of a directory that already exists, and
+// earlier versions created this one 0755. The state file names the agents that
+// are running and when, so another local account must not be able to read it.
+try { fs.chmodSync(STATE_DIR, 0o700) } catch {}
 
 // ---------------------------------------------------------------- singleton
 try {
@@ -48,7 +52,7 @@ try {
     }
   }
 } catch {}
-fs.writeFileSync(LOCK_FILE, String(process.pid))
+fs.writeFileSync(LOCK_FILE, String(process.pid), { mode: 0o600 })
 
 let cleaningUp = false
 function cleanup() {
@@ -236,7 +240,7 @@ function writeState() {
   lastBusySig = busySig()
   const tmp = STATE_FILE + '.tmp'
   try {
-    fs.writeFileSync(tmp, payload)
+    fs.writeFileSync(tmp, payload, { mode: 0o600 })
     fs.renameSync(tmp, STATE_FILE)   // atomic: the panel never reads a partial file
   } catch {}
 }
