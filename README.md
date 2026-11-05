@@ -145,4 +145,10 @@ configuration of its own; the only file it reads is the optional
 
 ## License
 
-MIT
+MIT, see [`LICENSE`](LICENSE).
+
+The agent marks under `scripts/preview/logos/` (used only to render
+`preview.png`) come from LobeHub Icons and are MIT licensed, Copyright (c)
+2023 LobeHub. Their upstream copyright and permission notice is retained in
+[`scripts/preview/logos/LICENSE`](scripts/preview/logos/LICENSE) and applies to
+every SVG in that directory.
